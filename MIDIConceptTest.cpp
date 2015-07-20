@@ -16,6 +16,8 @@
 #include <sstream>
 #include <vector>
 
+//#define NOPEN
+//#define MESSAGEWINDOW
 
 int DPrintf(const char* fmt, ...) {
 	char buffer[4096];
@@ -149,13 +151,14 @@ void CALLBACK MidiInCallback(HMIDIIN hMidiIn, UINT uMsg, DWORD dwInstance, DWORD
 	auto device = handleMap.find(hMidiIn);
 	if (device == handleMap.end())
 		return;
+	DPrintf("MIM_CLOSE is received\n");
 	RemoveDevice(device->second);
 	handleMap.erase(hMidiIn);
 	// midiInClose should be called later (Note: forbidden to call from here)
 	closingHandleSet.insert(hMidiIn);
 }
 
-void UpdateDeviceList() {
+void UpdateDeviceList(bool remove_only=false) {
 	DPrintf("UpdateDeviceList\n");
 
 	// Add new devices.
@@ -177,7 +180,7 @@ void UpdateDeviceList() {
 		int deviceCount = 0;
 		if (entry != productMap.end())
 			deviceCount = entry->second.size();
-		if (newDeviceCount > deviceCount) {
+		if (!remove_only && newDeviceCount > deviceCount) {
 			MidiDevice device(caps, NextDeviceIndex(product));
 #ifndef NOPEN  // If you do not want to open the device here, define NOPEN.
 			midiInOpen(&device.mHMidi, i, reinterpret_cast<DWORD_PTR>(&MidiInCallback), NULL, CALLBACK_FUNCTION);
@@ -218,11 +221,17 @@ LRESULT CALLBACK DeviceNotifyWindowProc(HWND hWnd, UINT message, WPARAM wParam, 
 	switch (message) {
 	case WM_DEVICECHANGE:
 		if (wParam == DBT_DEVNODES_CHANGED) {
+			// DBT_DEVNODES_CHANGED is not available for message-only windows.
 			DPrintf("WM_DEVICECHANGE: DBT_DEVNODES_CHANGES\n");
 			UpdateDeviceList();
 		} else {
 			// DBT_DEVICEARRIVAL and DBT_DEVICEREMOVECOMPLETE will be notified if it is enabled by RegisterDeviceNotification.
-			DPrintf("WM_DEVICECHANGE: wParam=%04x, lParam=%04x\n", wParam, lParam);
+			DPrintf("WM_DEVICECHANGE: wParam=%08x, lParam=%08x\n", wParam, lParam);
+			PDEV_BROADCAST_HDR pdbh = reinterpret_cast<PDEV_BROADCAST_HDR>(lParam);
+			DPrintf("  type=%08x\n", pdbh->dbch_devicetype);
+#ifdef MESSAGEWINDOW
+			UpdateDeviceList(wParam == DBT_DEVICEREMOVECOMPLETE);
+#endif
 		}
 		return TRUE;
 	default:
@@ -240,9 +249,13 @@ int APIENTRY _tWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstanc
 	wcex.hInstance = hInstance;
 	wcex.lpszClassName = _T("DeviceNotifyWindowClass");
 	RegisterClassEx(&wcex);
-	HWND hWnd = CreateWindow(wcex.lpszClassName, _T("MIDIConectpTest - DeviceNotify"), 0, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+	HWND hParentWnd = NULL;
+#ifdef MESSAGEWINDOW
+	hParentWnd = HWND_MESSAGE;
+#endif
+	HWND hWnd = CreateWindow(wcex.lpszClassName, _T("MIDIConectpTest - DeviceNotify"), 0, CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, hParentWnd, NULL, hInstance, NULL);
 
-#if 0
+#ifdef MESSAGEWINDOW
 	DEV_BROADCAST_DEVICEINTERFACE filter;
 	filter.dbcc_size = sizeof(filter);
 	filter.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
