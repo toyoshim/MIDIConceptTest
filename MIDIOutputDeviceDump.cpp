@@ -32,7 +32,7 @@ int main() {
 		if (caps.wTechnology == MOD_SWSYNTH)
 			puts("      This device is declared as a software synth.");
 	}
-
-	for (;;);
+	fflush(stdout);
+	fgetc(stdin);
 	return 0;
 }
