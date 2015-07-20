@@ -25,6 +25,7 @@ int DPrintf(const char* fmt, ...) {
 	va_start(args, fmt);
 	int result = vsnprintf(buffer, 4096, fmt, args);
 	OutputDebugStringA(buffer);
+	puts(buffer);
 	va_end(args);
 	return result;
 }
