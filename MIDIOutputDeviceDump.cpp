@@ -19,7 +19,7 @@ int main() {
 	puts("=== MIDI Output device information ===");
 
 	UINT uNumDevs = midiOutGetNumDevs();
-	printf("%d device(s) found:\n");
+	printf("%d device(s) found:\n", uNumDevs);
 	for (UINT i = 0; i < uNumDevs; ++i) {
 		MIDIOUTCAPS2 caps;
 		midiOutGetDevCaps(i, reinterpret_cast<LPMIDIOUTCAPS>(&caps), sizeof(caps));
